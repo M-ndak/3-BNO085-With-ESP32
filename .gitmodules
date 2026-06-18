@@ -1,0 +1,3 @@
+[submodule "lib/BNO085"]
+	path = lib/BNO085
+	url = git@github.com:M-ndak/BNO085-ESP32-Library-.git
