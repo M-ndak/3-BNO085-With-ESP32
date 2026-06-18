@@ -14,8 +14,7 @@ simultaneously without interfering with each other.
 ## Hardware
 
 - ESP32
-- 3x BNO085 IMU sensors
-- 4.7kΩ pull-up resistors on SDA and SCL
+- 3x BNO085 IMU sensors(Using 7semi BNO08x for my project)
 
 ## I2C Addressing
 
@@ -24,9 +23,9 @@ by multiplexing:
 
 | Sensor | ADR Pin | Address |
 |--------|---------|---------|
-| IMU 1  | GND     | 0x4A    |
-| IMU 2  | 3.3V    | 0x4B    |
-| IMU 3  | Multiplexed | 0x4A / 0x4B |
+| IMU 1  | GND     | 0x4B    |
+| IMU 2  | 3.3V    | 0x4A    |
+| IMU 3  | Using TwoWire | 0x4A / 0x4B |
 
 ## Wiring
 
@@ -34,8 +33,8 @@ by multiplexing:
 |------------|--------------------|
 | VDD        | 3.3V               |
 | GND        | GND                |
-| SDA        | GPIO21 + 4.7kΩ pullup |
-| SCL        | GPIO22 + 4.7kΩ pullup |
+| SDA        | GPIO21  |
+| SCL        | GPIO22  |
 | RST        | GPIO4 (optional)   |
 | PS0        | GND (I²C mode)     |
 | PS1        | GND (I²C mode)     |
@@ -66,6 +65,3 @@ git clone --recurse-submodules git@github.com:M-ndak/3-BNO085-With-ESP32.git
 
 - Occasional sensor dropout at startup — power cycle resolves it
 
-## Dev Log
-
-See [DEVLOG.md](DEVLOG.md) for development history.
