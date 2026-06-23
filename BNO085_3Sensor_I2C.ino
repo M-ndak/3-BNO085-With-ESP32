@@ -1,7 +1,6 @@
 /*
  * ESP32 (30-pin WROOM-32) + 3× BNO085 via I²C
- * Library: SparkFun_BNO08x_Arduino_Library (patched — use the
- *          SparkFun_BNO08x_Arduino_Library_I2C.cpp from this session)
+ * Library: SparkFun_BNO08x_Arduino_Library (patched)
  *
  * ── WHY I²C INSTEAD OF SPI ────────────────────────────────────────────────────
  * I²C needs only 2 shared wires (SDA/SCL) plus one RST per sensor.
@@ -11,60 +10,8 @@
  *
  * ── I²C ADDRESS SELECTION ────────────────────────────────────────────────────
  * The BNO085 breakout has an ADR solder jumper (or pad):
- *   ADR = 0 (pad open / GND)  → 0x4A
- *   ADR = 1 (pad bridged/3V3) → 0x4B
- *
- * SparkFun's board has TWO address jumpers (ADR0, ADR1) giving 4 addresses:
- *   ADR1=0, ADR0=0 → 0x4A   (default, both open)
- *   ADR1=0, ADR0=1 → 0x4B
- *   ADR1=1, ADR0=0 → 0x4C   ← only on some breakout variants
- *   ADR1=1, ADR0=1 → 0x4D   ← only on some breakout variants
- *
- * If your boards only have one ADR jumper you can only get 0x4A and 0x4B on
- * the SAME I²C bus. The third sensor must go on a SECOND I²C bus (Wire1) or
- * use an I²C multiplexer (TCA9548A). This sketch uses Wire1 for IMU2.
- * Adjust as needed for your specific breakout variant.
- *
- * ── TIMING — HOW WE AVOID ESP32 ↔ BNO085 RACE CONDITIONS ────────────────────
- *
- * Problem 1 — Power-on sequencing
- *   All 3 sensors share 3V3. Their internal oscillators don't all start at
- *   exactly the same moment. We wait 2000ms after power-on before touching
- *   any sensor. This is longer than the BNO085 datasheet worst-case (300ms)
- *   and covers the case where the 3V3 rail rises slowly.
- *
- * Problem 2 — RST pin floating before begin()
- *   The library's begin() previously set RST as INPUT_PULLUP, so the pin
- *   floated until hal_hardwareReset() was called. A floating RST can hold
- *   the sensor in reset while we probe I²C → NACK → false init failure.
- *   FIX (in library .cpp): RST is now driven HIGH as OUTPUT immediately in
- *   begin() before the isConnected() probe.
- *
- * Problem 3 — Staggered inits on a shared bus
- *   When two sensors share a bus (Wire), initialising them simultaneously
- *   causes their RST pulses to overlap. The sensor coming out of reset drives
- *   SDA LOW momentarily (its I²C address ACK during boot), which looks like
- *   a NACK to the other sensor mid-transaction.
- *   FIX: init sensors one at a time with a 500ms gap between each.
- *
- * Problem 4 — I²C clock stretching timeout on ESP32
- *   The ESP32 I²C driver has a default clock-stretch timeout of ~50ms.
- *   The BNO085 can stretch the clock during heavy computation (fusion updates).
- *   If it stretches longer than the timeout the ESP32 resets the bus → garbled
- *   packet → library loses sync.
- *   FIX: Wire.setTimeOut(200) raises the timeout to 200ms which covers the
- *   BNO085 worst case. Also Wire.begin() is called with explicit SDA/SCL pins
- *   and 400kHz (Fast-mode) which reduces per-byte time and leaves more headroom.
- *
- * Problem 5 — INT not used (polling instead)
- *   Over I²C the INT pin is optional. Passing int_pin = -1 to begin() puts
- *   the library into pure polling mode: getSensorEvent() calls sh2_service()
- *   which calls i2chal_read() which starts every read with a non-blocking INT
- *   check. Because we pass -1, that check always passes and we read directly.
- *   Polling at 10ms intervals gives 100Hz which is faster than our 10ms report
- *   interval, so we never miss a sample.
- *   (If you do want INT-driven reads, wire INT and pass the pin number.)
- *
+ *   ADR = 0 (pad open / GND)  → 0x4B
+ *   ADR = 1 (pad bridged/3V3) → 0x4A
  * ── PIN WIRING ────────────────────────────────────────────────────────────────
  *
  *  ┌─────────────────────────────────────────────────────────────┐
@@ -93,13 +40,6 @@
  *  │                 PS0 ──── GND                                │
  *  │                 PS1 ──── GND                                │
  *  └─────────────────────────────────────────────────────────────┘
- *
- *  PULL-UP RESISTORS (required for I²C):
- *    Wire  (GPIO21/22): 4.7kΩ each from SDA→3V3 and SCL→3V3
- *    Wire1 (GPIO33/32): 4.7kΩ each from SDA→3V3 and SCL→3V3
- *    (SparkFun breakouts have on-board 10kΩ pull-ups but adding 4.7kΩ in
- *     parallel gives ~3.3kΩ which is better for 400kHz with cable capacitance)
- *
  *  PS0 and PS1 (protocol select):
  *    Both LOW  → I²C mode  (what we want here)
  *    Both HIGH → SPI mode
